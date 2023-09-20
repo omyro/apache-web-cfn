@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation Template which creates Apache webserver, elastic IP, and uses mappings, parameters and outputs. Note that you are billed
+  for the AWS re sources that you use when you create a stack from this template.
+
+
+Parameters:
+  IpAddress:
+    Description: Your IP Address
+    Type: String
+  InstanceType:
+    Description: Provide an instance type 
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t1.micro
+      - t2.nano
+      - t2.micro
+  KeyName:
+    Description: Choose your keypair
+    Type: AWS::EC2::KeyPair::KeyName
+  
+
+Mappings:
+  AWSRegionAMI:
+    us-east-1:
+      AMI: ami-00c6177f250e07ec1
+    us-west-1:
+      AMI: ami-02daa508cbc334270
+    us-west-2:
+      AMI: ami-038937b3d6616035f
+
+
+Resources:
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties: 
+      Domain: !ImportValue SampleNetworkCrossStack-VPCID
+  ElasticIpAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref WebServer
+      EIP: !Ref ElasticIp 
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [AWSRegionAMI, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !ImportValue SampleNetworkCrossStack-SubnetID
+      IamInstanceProfile: june_SSM_full_access
+      SecurityGroupIds:
+        - !ImportValue SampleNetworkCrossStack-SecurityGroupID
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install httpd -y
+          systemctl start httpd
+          systemctl enable httpd
+          echo "Launching this EC2 in region: ${AWS::Region}" > /var/www/html/index.html
+  SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties: 
+      Description: This adds inbound rule to allow SSH on port 22 from my IP address.
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      GroupId: !ImportValue SampleNetworkCrossStack-SecurityGroupID
+      CidrIp: !Sub '${IpAddress}/24'
+
+
+Outputs:
+  PrivateIp: 
+    Description: This is the private IP of the webserver
+    Value: !GetAtt WebServer.PrivateIp
+  PublicIp:
+    Description: This is the public IP of the webserver
+    Value: !GetAtt WebServer.PublicIp
+  PublicDNSName: 
+    Description: This is the public DNS name of the webserver
+    Value: !GetAtt WebServer.PublicDnsName
