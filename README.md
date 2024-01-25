@@ -1,0 +1,1 @@
+AWS CloudFormation template which creates Apache webserver, elastic IP, and uses mappings, parameters and outputs. Note that you are billed for the AWS resources that you use when you create a stack from this template.
